@@ -1,0 +1,180 @@
+---------------------------------------------------------------------------
+--
+-- email.source
+--
+-- COMP9315 Database Systems Implementation
+-- Assignment 1
+-- Group Work
+-- Group members:
+-- Pan Luo z5192086
+-- Zhidong Luo z5181142
+-- Shuxiang Zou z5187969
+---------------------------------------------------------------------------
+--   We implement a new data type called "EmailAddr". This is an email 
+-- data type which checks whether the email address is valid. We follow the
+-- instructions given by assignment spec. In this document, we mainly do
+-- the type creation in postgresql server. 
+---------------------------------------------------------------------------
+
+-- 'email_in' is an input function for converting the text representation 
+-- into the internal (in memory) representation in database.
+
+CREATE FUNCTION email_in(cstring)
+   RETURNS emailaddr
+   AS '_OBJWD_/email'
+   LANGUAGE C IMMUTABLE STRICT;
+
+-- 'email_out' is an output function for converting the internel 
+-- representation into the text representation.
+
+CREATE FUNCTION email_out(emailaddr)
+   RETURNS cstring
+   AS '_OBJWD_/email'
+   LANGUAGE C IMMUTABLE STRICT;
+
+-- now, we can create the type. The internallength specifies the size of 
+-- the memory block required to hold the type (we need 257(local)+
+-- 257(domain)+1(@) bits).
+
+CREATE TYPE emailaddr (
+   input          = email_in,
+   output         = email_out
+);
+
+
+-- define different operators.
+
+CREATE FUNCTION e_lt(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_le(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_eq(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_noteq(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_gt(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_ge(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_same_domain(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_not_same_domain(emailaddr, emailaddr) RETURNS bool
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+
+
+CREATE OPERATOR < (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_lt,
+   commutator = > ,
+   negator    = >= ,
+   restrict   = scalarltsel,
+   join       = scalarltjoinsel
+);
+
+CREATE OPERATOR <= (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_le,
+   commutator = >= ,
+   negator    = > ,
+   restrict   = scalarltsel,
+   join       = scalarltjoinsel
+);
+
+CREATE OPERATOR = (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_eq,
+   commutator = = ,
+   negator    = <>,
+   restrict   = eqsel,
+   join       = eqjoinsel,
+   HASHES
+ 
+);
+
+CREATE OPERATOR <> (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_noteq,
+   commutator = <> ,
+   negator    = =,
+   restrict   = neqsel,
+   join       = neqjoinsel
+);
+
+CREATE OPERATOR >= (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_ge,
+   commutator = <= ,
+   negator    = < ,
+   restrict   = scalargtsel,
+   join       = scalargtjoinsel
+);
+
+CREATE OPERATOR > (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_gt,
+   commutator = < ,
+   negator    = <= ,
+   restrict   = scalargtsel,
+   join       = scalargtjoinsel
+);
+
+CREATE OPERATOR ~ (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_same_domain,
+   commutator = ~ ,
+   negator    = !~ ,
+   restrict   = eqsel,
+   join       = eqjoinsel,
+   HASHES
+);
+
+CREATE OPERATOR !~ (
+   leftarg    = emailaddr,
+   rightarg   = emailaddr,
+   procedure  = e_not_same_domain,
+   commutator = !~ ,
+   negator    = ~ ,
+   restrict   = neqsel,
+   join       = neqjoinsel
+);
+
+
+-- create the support function
+
+CREATE FUNCTION e_cmp(emailaddr, emailaddr) RETURNS int4
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+CREATE FUNCTION e_hval(emailaddr) RETURNS int4
+   AS '_OBJWD_/email' LANGUAGE C IMMUTABLE STRICT;
+
+
+-- make the operator class
+
+CREATE OPERATOR CLASS emailaddr_btree_ops
+    DEFAULT FOR TYPE emailaddr USING btree AS
+        OPERATOR        1       <  (emailaddr, emailaddr),
+        OPERATOR        2       <= (emailaddr, emailaddr),
+        OPERATOR        3       =  (emailaddr, emailaddr),
+        OPERATOR        4       >= (emailaddr, emailaddr),
+        OPERATOR        5       >  (emailaddr, emailaddr),
+	FUNCTION        1       e_cmp(emailaddr, emailaddr);
+
+CREATE OPERATOR CLASS emailaddr_hash_ops
+    DEFAULT FOR TYPE emailaddr USING hash AS
+        OPERATOR        1       = ,
+        FUNCTION        1       e_hval(emailaddr);
